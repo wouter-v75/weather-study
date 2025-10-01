@@ -418,30 +418,32 @@
           return yearlyAvgs && yearlyAvgs.length > 0 ? Math.max(...yearlyAvgs) : null;
         });
         
-        // Error bar upper bound (invisible line for fill reference)
+        // Error bar upper bound
         avgDatasets.push({
-          label: `${point.name} error range`,
+          label: `${point.name} error upper`,
           data: errorMax,
-          borderColor: 'transparent',
-          backgroundColor: colors[idx] + '50', // 50 = ~31% opacity in hex
+          borderColor: colors[idx],
+          backgroundColor: colors[idx],
           tension: 0.1,
           spanGaps: true,
-          fill: '+1', // Fill to next dataset (which will be errorMin)
           pointRadius: 0,
-          order: 3
+          borderWidth: 0,
+          order: 3,
+          fill: false
         });
         
-        // Error bar lower bound
+        // Error bar lower bound (fills between upper and lower)
         avgDatasets.push({
-          label: `${point.name} error lower`,
+          label: `${point.name} (yearly range)`,
           data: errorMin,
-          borderColor: 'transparent',
-          backgroundColor: colors[idx] + '50',
+          borderColor: colors[idx],
+          backgroundColor: colors[idx] + '80', // 80 = 50% opacity
           tension: 0.1,
           spanGaps: true,
           pointRadius: 0,
-          order: 3,
-          hidden: true // Hide from legend
+          borderWidth: 0,
+          fill: '-1', // Fill to previous dataset (upper bound)
+          order: 3
         });
         
         // Average line (solid) - this is the overall average across all years
@@ -504,8 +506,8 @@
               position: 'top',
               labels: {
                 filter: function(item, chart) {
-                  // Hide "error lower" entries from legend
-                  return !item.text.includes('error lower');
+                  // Hide "error upper" entries from legend
+                  return !item.text.includes('error upper');
                 }
               }
             },
