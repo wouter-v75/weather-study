@@ -612,13 +612,14 @@
       const container = document.getElementById('windRoseContainer');
       container.innerHTML = '';
       
-      // Speed bins for wind rose (in knots)
+      // Speed bins for wind rose (in knots) with better colors
       const speedBins = [
-        { min: 0, max: 5, label: '0-5 kts', color: '#e0f2fe' },
-        { min: 5, max: 10, label: '5-10 kts', color: '#7dd3fc' },
-        { min: 10, max: 15, label: '10-15 kts', color: '#38bdf8' },
-        { min: 15, max: 20, label: '15-20 kts', color: '#0ea5e9' },
-        { min: 20, max: 100, label: '20+ kts', color: '#0369a1' }
+        { min: 0, max: 5, label: '0-5 kts', color: '#c6e5f5' },
+        { min: 5, max: 10, label: '5-10 kts', color: '#73b9e3' },
+        { min: 10, max: 15, label: '10-15 kts', color: '#3d8dc9' },
+        { min: 15, max: 20, label: '15-20 kts', color: '#1e5a8e' },
+        { min: 20, max: 25, label: '20-25 kts', color: '#8b3a8f' },
+        { min: 25, max: 100, label: '25+ kts', color: '#d43d51' }
       ];
       
       const directionSectors = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
@@ -674,8 +675,18 @@
         chartDiv.className = 'bg-white p-4 rounded border';
         chartDiv.innerHTML = `
           <h3 class="font-semibold mb-2" style="color: ${colors[idx]}">${point.name}</h3>
-          <div style="height: 500px;">
-            <canvas id="windRose${point.id}"></canvas>
+          <div class="flex flex-col items-center">
+            <div style="height: 450px; width: 100%; max-width: 450px;">
+              <canvas id="windRose${point.id}"></canvas>
+            </div>
+            <div class="mt-4 flex flex-wrap gap-3 justify-center text-xs">
+              ${speedBins.map(bin => `
+                <div class="flex items-center gap-1">
+                  <div style="width: 16px; height: 16px; background-color: ${bin.color}; border: 1px solid #ccc;"></div>
+                  <span>${bin.label}</span>
+                </div>
+              `).join('')}
+            </div>
           </div>
         `;
         container.appendChild(chartDiv);
