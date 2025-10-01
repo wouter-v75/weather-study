@@ -162,6 +162,7 @@
             <div class="p-4 space-y-6">
               <div>
                 <h2 class="font-semibold text-lg mb-2" id="avgChartTitle">Average Wind Speed at 10m (knots) by Day of Month</h2>
+                <p class="text-xs text-gray-600 mb-2">Shaded areas show range of yearly averages. Dotted lines show instantaneous min/max within time window.</p>
                 <div style="height: 300px;">
                   <canvas id="avgChart"></canvas>
                 </div>
@@ -346,29 +347,44 @@
     function updateCharts() {
       const startTime = document.getElementById('startTime').value;
       const endTime = document.getElementById('endTime').value;
-      const startYear = document.getElementById('startYear').value;
-      const endYear = document.getElementById('endYear').value;
+      const startYear = parseInt(document.getElementById('startYear').value);
+      const endYear = parseInt(document.getElementById('endYear').value);
       const monthName = document.getElementById('selectedMonth').selectedOptions[0].text;
 
       // Calculate average, max, and min wind speed by day of month for each point
+      // Also calculate yearly averages for error bars
       const avgByDay = {};
       const maxByDay = {};
       const minByDay = {};
+      const yearlyAvgByDay = {}; // For error bars: {pointName: {day: [year1Avg, year2Avg, ...]}}
       
       points.forEach(point => {
         avgByDay[point.name] = {};
         maxByDay[point.name] = {};
         minByDay[point.name] = {};
+        yearlyAvgByDay[point.name] = {};
         
         for (let day = 1; day <= 31; day++) {
           const dayData = weatherData.filter(d => 
             d.pointId === point.id && d.dayOfMonth === day
           );
+          
           if (dayData.length > 0) {
             const speeds = dayData.map(d => d.windSpeed);
             avgByDay[point.name][day] = speeds.reduce((sum, s) => sum + s, 0) / speeds.length;
             maxByDay[point.name][day] = Math.max(...speeds);
             minByDay[point.name][day] = Math.min(...speeds);
+            
+            // Calculate yearly averages for error bars
+            const yearlyAvgs = [];
+            for (let year = startYear; year <= endYear; year++) {
+              const yearDayData = dayData.filter(d => d.year === year);
+              if (yearDayData.length > 0) {
+                const yearAvg = yearDayData.reduce((sum, d) => sum + d.windSpeed, 0) / yearDayData.length;
+                yearlyAvgs.push(yearAvg);
+              }
+            }
+            yearlyAvgByDay[point.name][day] = yearlyAvgs;
           }
         }
       });
@@ -378,7 +394,44 @@
       const avgDatasets = [];
       
       points.forEach((point, idx) => {
-        // Average line (solid)
+        // Calculate error bar ranges (min and max of yearly averages)
+        const errorMin = days.map(day => {
+          const yearlyAvgs = yearlyAvgByDay[point.name][day];
+          return yearlyAvgs && yearlyAvgs.length > 0 ? Math.min(...yearlyAvgs) : null;
+        });
+        
+        const errorMax = days.map(day => {
+          const yearlyAvgs = yearlyAvgByDay[point.name][day];
+          return yearlyAvgs && yearlyAvgs.length > 0 ? Math.max(...yearlyAvgs) : null;
+        });
+        
+        // Error bar upper bound (invisible line for fill reference)
+        avgDatasets.push({
+          label: `${point.name} error range`,
+          data: errorMax,
+          borderColor: 'transparent',
+          backgroundColor: colors[idx] + '20', // 20 = ~12% opacity in hex
+          tension: 0.1,
+          spanGaps: true,
+          fill: '+1', // Fill to next dataset (which will be errorMin)
+          pointRadius: 0,
+          order: 3
+        });
+        
+        // Error bar lower bound
+        avgDatasets.push({
+          label: `${point.name} error lower`,
+          data: errorMin,
+          borderColor: 'transparent',
+          backgroundColor: colors[idx] + '20',
+          tension: 0.1,
+          spanGaps: true,
+          pointRadius: 0,
+          order: 3,
+          hidden: true // Hide from legend
+        });
+        
+        // Average line (solid) - this is the overall average across all years
         avgDatasets.push({
           label: `${point.name} (avg)`,
           data: days.map(day => avgByDay[point.name][day] || null),
@@ -386,10 +439,11 @@
           backgroundColor: colors[idx],
           tension: 0.1,
           spanGaps: true,
-          borderWidth: 2
+          borderWidth: 2,
+          order: 1
         });
         
-        // Maximum line (dotted)
+        // Maximum line (dotted) - instantaneous max within time window
         avgDatasets.push({
           label: `${point.name} (max)`,
           data: days.map(day => maxByDay[point.name][day] || null),
@@ -399,10 +453,11 @@
           spanGaps: true,
           borderDash: [5, 5],
           borderWidth: 1.5,
-          pointRadius: 0
+          pointRadius: 0,
+          order: 2
         });
         
-        // Minimum line (dotted)
+        // Minimum line (dotted) - instantaneous min within time window
         avgDatasets.push({
           label: `${point.name} (min)`,
           data: days.map(day => minByDay[point.name][day] || null),
@@ -412,12 +467,13 @@
           spanGaps: true,
           borderDash: [5, 5],
           borderWidth: 1.5,
-          pointRadius: 0
+          pointRadius: 0,
+          order: 2
         });
       });
 
       document.getElementById('avgChartTitle').textContent = 
-        `Average Wind Speed at 10m (knots) by Day of Month (${monthName} ${startYear}-${endYear}, ${startTime}-${endTime})`;
+        `Average Wind Speed at 10m (knots) by Day of Month (${monthName} ${startYear}-${endYear}, ${startTime}-${endTime})\nShaded areas show yearly average range`;
 
       if (avgChart) avgChart.destroy();
       const avgCtx = document.getElementById('avgChart').getContext('2d');
@@ -431,10 +487,22 @@
           responsive: true,
           maintainAspectRatio: false,
           plugins: {
-            legend: { position: 'top' },
+            legend: { 
+              position: 'top',
+              labels: {
+                filter: function(item, chart) {
+                  // Hide "error lower" entries from legend
+                  return !item.text.includes('error lower');
+                }
+              }
+            },
             tooltip: {
               mode: 'index',
               intersect: false,
+              filter: function(tooltipItem) {
+                // Hide error bar bounds from tooltip
+                return !tooltipItem.dataset.label.includes('error');
+              }
             }
           },
           scales: {
