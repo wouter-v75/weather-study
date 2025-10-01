@@ -104,6 +104,24 @@
               <h2 class="font-semibold text-lg mb-3">Daily Time Window</h2>
               <div class="space-y-3">
                 <div>
+                  <label class="block text-sm font-medium mb-1">Time Zone</label>
+                  <select
+                    id="timezone"
+                    class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none"
+                  >
+                    <option value="Europe/Berlin">CET (Central European Time)</option>
+                    <option value="UTC">UTC (Coordinated Universal Time)</option>
+                    <option value="Europe/London">GMT (Greenwich Mean Time)</option>
+                    <option value="America/New_York">EST (Eastern Standard Time)</option>
+                    <option value="America/Chicago">CST (Central Standard Time)</option>
+                    <option value="America/Denver">MST (Mountain Standard Time)</option>
+                    <option value="America/Los_Angeles">PST (Pacific Standard Time)</option>
+                    <option value="Asia/Tokyo">JST (Japan Standard Time)</option>
+                    <option value="Australia/Sydney">AEST (Australian Eastern Time)</option>
+                    <option value="auto">Auto (Location-based)</option>
+                  </select>
+                </div>
+                <div>
                   <label class="block text-sm font-medium mb-1">Start Time</label>
                   <input
                     type="time"
@@ -174,7 +192,7 @@
 
     // Initialize map
     function initMap() {
-      map = L.map('map').setView([40, -95], 4);
+      map = L.map('map').setView([37, 15], 5);
       
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap contributors'
@@ -269,6 +287,7 @@
       const selectedMonth = document.getElementById('selectedMonth').value;
       const startTime = document.getElementById('startTime').value;
       const endTime = document.getElementById('endTime').value;
+      const timezone = document.getElementById('timezone').value;
 
       document.getElementById('displayStartTime').textContent = startTime;
       document.getElementById('displayEndTime').textContent = endTime;
@@ -282,7 +301,7 @@
             const startDate = `${year}-${selectedMonth}-01`;
             const endDate = `${year}-${selectedMonth}-${daysInMonth}`;
 
-            const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${point.lat}&longitude=${point.lng}&start_date=${startDate}&end_date=${endDate}&hourly=windspeed_10m&timezone=auto`;
+            const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${point.lat}&longitude=${point.lng}&start_date=${startDate}&end_date=${endDate}&hourly=windspeed_10m&timezone=${timezone}`;
             
             const response = await fetch(url);
             const data = await response.json();
