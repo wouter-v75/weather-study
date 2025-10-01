@@ -645,30 +645,22 @@
           }
         });
         
-        // Convert counts to percentages and calculate cumulative for stacking
+        // Convert counts to percentages (non-cumulative)
         const total = pointData.length;
-        const cumulativeData = directionSectors.map(() => Array(speedBins.length).fill(0));
-        
-        directionSectors.forEach((dir, dirIdx) => {
-          let cumulative = 0;
-          for (let binIdx = 0; binIdx < speedBins.length; binIdx++) {
-            const percentage = (directionData[dir][binIdx] / total * 100);
-            cumulative += percentage;
-            cumulativeData[dirIdx][binIdx] = cumulative;
-          }
+        Object.keys(directionData).forEach(dir => {
+          directionData[dir] = directionData[dir].map(count => (count / total * 100));
         });
         
-        // Create datasets for polar area chart (reversed order so lightest on top)
-        const datasets = speedBins.slice().reverse().map((bin, idx) => {
-          const binIdx = speedBins.length - 1 - idx;
-          return {
-            label: bin.label,
-            data: directionSectors.map((dir, dirIdx) => cumulativeData[dirIdx][binIdx]),
-            backgroundColor: bin.color,
-            borderWidth: 1,
-            borderColor: 'white'
-          };
-        });
+        // Create datasets for each speed bin (from slowest to fastest for proper stacking)
+        const datasets = speedBins.map((bin, binIdx) => ({
+          label: bin.label,
+          data: directionSectors.map(dir => directionData[dir][binIdx]),
+          backgroundColor: bin.color + '80', // Add transparency
+          borderColor: bin.color,
+          borderWidth: 2,
+          fill: true,
+          pointRadius: 0
+        }));
         
         // Create canvas for this point
         const chartDiv = document.createElement('div');
@@ -694,7 +686,7 @@
         // Create chart
         const ctx = document.getElementById(`windRose${point.id}`).getContext('2d');
         const chart = new Chart(ctx, {
-          type: 'polarArea',
+          type: 'radar',
           data: {
             labels: directionSectors,
             datasets: datasets
@@ -720,10 +712,17 @@
                 ticks: {
                   callback: function(value) {
                     return value + '%';
-                  }
+                  },
+                  stepSize: 5
                 },
                 grid: {
                   circular: true
+                },
+                pointLabels: {
+                  font: {
+                    size: 12,
+                    weight: 'bold'
+                  }
                 }
               }
             }
