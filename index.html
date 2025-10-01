@@ -174,6 +174,14 @@
                   <canvas id="distChart"></canvas>
                 </div>
               </div>
+              
+              <div class="border-t pt-4">
+                <h2 class="font-semibold text-lg mb-2">Wind Rose (Direction & Speed Frequency)</h2>
+                <p class="text-xs text-gray-600 mb-2">Polar charts showing wind direction frequency and speed distribution for each location</p>
+                <div id="windRoseContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <!-- Wind rose charts will be added here dynamically -->
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -189,6 +197,7 @@
     let weatherData = [];
     let avgChart = null;
     let distChart = null;
+    let windRoseCharts = [];
     const colors = ['#3b82f6', '#ef4444', '#10b981'];
 
     // Initialize map
@@ -254,6 +263,8 @@
           updateCharts();
         } else {
           document.getElementById('chartsContainer').style.display = 'none';
+          windRoseCharts.forEach(chart => chart.destroy());
+          windRoseCharts = [];
         }
       }
     }
@@ -302,7 +313,7 @@
             const startDate = `${year}-${selectedMonth}-01`;
             const endDate = `${year}-${selectedMonth}-${daysInMonth}`;
 
-            const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${point.lat}&longitude=${point.lng}&start_date=${startDate}&end_date=${endDate}&hourly=windspeed_10m&timezone=${timezone}`;
+            const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${point.lat}&longitude=${point.lng}&start_date=${startDate}&end_date=${endDate}&hourly=windspeed_10m,wind_direction_10m&timezone=${timezone}`;
             
             const response = await fetch(url);
             const data = await response.json();
@@ -311,7 +322,8 @@
               const filteredData = data.hourly.time
                 .map((time, idx) => ({
                   time,
-                  wind: data.hourly.windspeed_10m[idx]
+                  wind: data.hourly.windspeed_10m[idx],
+                  direction: data.hourly.wind_direction_10m[idx]
                 }))
                 .filter(item => isTimeInRange(item.time, startTime, endTime));
 
@@ -327,7 +339,8 @@
                   pointName: point.name,
                   year: year,
                   dayOfMonth: dayOfMonth,
-                  windSpeed: windSpeedKnots
+                  windSpeed: windSpeedKnots,
+                  windDirection: item.direction
                 });
               });
             }
@@ -577,6 +590,136 @@
             }
           }
         }
+      });
+      
+      // Create wind roses
+      createWindRoses();
+    }
+
+    function getDirectionSector(degrees) {
+      // Convert wind direction to 16 sectors
+      const sectors = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
+      const sectorSize = 360 / 16;
+      const index = Math.round(((degrees % 360) / sectorSize)) % 16;
+      return sectors[index];
+    }
+
+    function createWindRoses() {
+      // Clear existing charts
+      windRoseCharts.forEach(chart => chart.destroy());
+      windRoseCharts = [];
+      
+      const container = document.getElementById('windRoseContainer');
+      container.innerHTML = '';
+      
+      // Speed bins for wind rose (in knots)
+      const speedBins = [
+        { min: 0, max: 5, label: '0-5 kts', color: '#e0f2fe' },
+        { min: 5, max: 10, label: '5-10 kts', color: '#7dd3fc' },
+        { min: 10, max: 15, label: '10-15 kts', color: '#38bdf8' },
+        { min: 15, max: 20, label: '15-20 kts', color: '#0ea5e9' },
+        { min: 20, max: 100, label: '20+ kts', color: '#0369a1' }
+      ];
+      
+      const directionSectors = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
+      
+      points.forEach((point, idx) => {
+        const pointData = weatherData.filter(d => d.pointId === point.id);
+        
+        // Calculate frequency for each direction sector and speed bin
+        const directionData = {};
+        directionSectors.forEach(dir => {
+          directionData[dir] = speedBins.map(() => 0);
+        });
+        
+        pointData.forEach(d => {
+          const sector = getDirectionSector(d.windDirection);
+          const speed = d.windSpeed;
+          
+          for (let i = 0; i < speedBins.length; i++) {
+            if (speed >= speedBins[i].min && speed < speedBins[i].max) {
+              directionData[sector][i]++;
+              break;
+            }
+          }
+        });
+        
+        // Convert counts to percentages and calculate cumulative for stacking
+        const total = pointData.length;
+        const cumulativeData = directionSectors.map(() => Array(speedBins.length).fill(0));
+        
+        directionSectors.forEach((dir, dirIdx) => {
+          let cumulative = 0;
+          for (let binIdx = 0; binIdx < speedBins.length; binIdx++) {
+            const percentage = (directionData[dir][binIdx] / total * 100);
+            cumulative += percentage;
+            cumulativeData[dirIdx][binIdx] = cumulative;
+          }
+        });
+        
+        // Create datasets for polar area chart (reversed order so lightest on top)
+        const datasets = speedBins.slice().reverse().map((bin, idx) => {
+          const binIdx = speedBins.length - 1 - idx;
+          return {
+            label: bin.label,
+            data: directionSectors.map((dir, dirIdx) => cumulativeData[dirIdx][binIdx]),
+            backgroundColor: bin.color,
+            borderWidth: 1,
+            borderColor: 'white'
+          };
+        });
+        
+        // Create canvas for this point
+        const chartDiv = document.createElement('div');
+        chartDiv.className = 'bg-white p-4 rounded border';
+        chartDiv.innerHTML = `
+          <h3 class="font-semibold mb-2" style="color: ${colors[idx]}">${point.name}</h3>
+          <div style="height: 350px;">
+            <canvas id="windRose${point.id}"></canvas>
+          </div>
+        `;
+        container.appendChild(chartDiv);
+        
+        // Create chart
+        const ctx = document.getElementById(`windRose${point.id}`).getContext('2d');
+        const chart = new Chart(ctx, {
+          type: 'polarArea',
+          data: {
+            labels: directionSectors,
+            datasets: datasets
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: {
+                position: 'right'
+              },
+              tooltip: {
+                callbacks: {
+                  label: function(context) {
+                    return context.dataset.label + ': ' + context.parsed.r.toFixed(1) + '%';
+                  }
+                }
+              }
+            },
+            scales: {
+              r: {
+                beginAtZero: true,
+                ticks: {
+                  callback: function(value) {
+                    return value + '%';
+                  }
+                },
+                grid: {
+                  circular: true
+                }
+              }
+            }
+          }
+        });
+        
+        windRoseCharts.push(chart);
       });
     }
 
