@@ -331,32 +331,71 @@
       const endYear = document.getElementById('endYear').value;
       const monthName = document.getElementById('selectedMonth').selectedOptions[0].text;
 
-      // Calculate average wind speed by day of month for each point
+      // Calculate average, max, and min wind speed by day of month for each point
       const avgByDay = {};
+      const maxByDay = {};
+      const minByDay = {};
       
       points.forEach(point => {
         avgByDay[point.name] = {};
+        maxByDay[point.name] = {};
+        minByDay[point.name] = {};
+        
         for (let day = 1; day <= 31; day++) {
           const dayData = weatherData.filter(d => 
             d.pointId === point.id && d.dayOfMonth === day
           );
           if (dayData.length > 0) {
-            const avg = dayData.reduce((sum, d) => sum + d.windSpeed, 0) / dayData.length;
-            avgByDay[point.name][day] = avg;
+            const speeds = dayData.map(d => d.windSpeed);
+            avgByDay[point.name][day] = speeds.reduce((sum, s) => sum + s, 0) / speeds.length;
+            maxByDay[point.name][day] = Math.max(...speeds);
+            minByDay[point.name][day] = Math.min(...speeds);
           }
         }
       });
 
       // Update average chart
       const days = Array.from({length: 31}, (_, i) => i + 1);
-      const avgDatasets = points.map((point, idx) => ({
-        label: point.name,
-        data: days.map(day => avgByDay[point.name][day] || null),
-        borderColor: colors[idx],
-        backgroundColor: colors[idx],
-        tension: 0.1,
-        spanGaps: true
-      }));
+      const avgDatasets = [];
+      
+      points.forEach((point, idx) => {
+        // Average line (solid)
+        avgDatasets.push({
+          label: `${point.name} (avg)`,
+          data: days.map(day => avgByDay[point.name][day] || null),
+          borderColor: colors[idx],
+          backgroundColor: colors[idx],
+          tension: 0.1,
+          spanGaps: true,
+          borderWidth: 2
+        });
+        
+        // Maximum line (dotted)
+        avgDatasets.push({
+          label: `${point.name} (max)`,
+          data: days.map(day => maxByDay[point.name][day] || null),
+          borderColor: colors[idx],
+          backgroundColor: colors[idx],
+          tension: 0.1,
+          spanGaps: true,
+          borderDash: [5, 5],
+          borderWidth: 1.5,
+          pointRadius: 0
+        });
+        
+        // Minimum line (dotted)
+        avgDatasets.push({
+          label: `${point.name} (min)`,
+          data: days.map(day => minByDay[point.name][day] || null),
+          borderColor: colors[idx],
+          backgroundColor: colors[idx],
+          tension: 0.1,
+          spanGaps: true,
+          borderDash: [5, 5],
+          borderWidth: 1.5,
+          pointRadius: 0
+        });
+      });
 
       document.getElementById('avgChartTitle').textContent = 
         `Average Wind Speed at 10m (knots) by Day of Month (${monthName} ${startYear}-${endYear}, ${startTime}-${endTime})`;
