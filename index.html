@@ -39,7 +39,7 @@
     <div class="w-full h-screen flex flex-col bg-gray-50">
       <div class="bg-white shadow-sm border-b p-4">
         <h1 class="text-2xl font-bold text-gray-800">Historical Weather Data Map</h1>
-        <p class="text-sm text-gray-600 mt-1">Click on the map to select up to 3 points, then fetch weather data for specific time windows</p>
+        <p class="text-sm text-gray-600 mt-1">Select points and analyze wind speed patterns by month across years</p>
       </div>
 
       <div class="flex flex-1 overflow-hidden">
@@ -53,25 +53,49 @@
             </div>
 
             <div class="border-t pt-4">
-              <h2 class="font-semibold text-lg mb-3">Date Range</h2>
+              <h2 class="font-semibold text-lg mb-3">Time Period</h2>
               <div class="space-y-3">
                 <div>
-                  <label class="block text-sm font-medium mb-1">Start Date</label>
-                  <input
-                    type="date"
-                    id="startDate"
-                    value="2024-01-01"
-                    class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none"
-                  />
+                  <label class="block text-sm font-medium mb-1">Year Range</label>
+                  <div class="flex gap-2 items-center">
+                    <input
+                      type="number"
+                      id="startYear"
+                      value="2020"
+                      min="1940"
+                      max="2024"
+                      class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                    <span class="text-gray-500">to</span>
+                    <input
+                      type="number"
+                      id="endYear"
+                      value="2024"
+                      min="1940"
+                      max="2024"
+                      class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  </div>
                 </div>
                 <div>
-                  <label class="block text-sm font-medium mb-1">End Date</label>
-                  <input
-                    type="date"
-                    id="endDate"
-                    value="2024-01-31"
+                  <label class="block text-sm font-medium mb-1">Month</label>
+                  <select
+                    id="selectedMonth"
                     class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none"
-                  />
+                  >
+                    <option value="01">January</option>
+                    <option value="02">February</option>
+                    <option value="03">March</option>
+                    <option value="04">April</option>
+                    <option value="05">May</option>
+                    <option value="06">June</option>
+                    <option value="07">July</option>
+                    <option value="08">August</option>
+                    <option value="09">September</option>
+                    <option value="10">October</option>
+                    <option value="11">November</option>
+                    <option value="12">December</option>
+                  </select>
                 </div>
               </div>
             </div>
@@ -110,30 +134,27 @@
             >
               Fetch Weather Data
             </button>
-
-            <div id="metricSelector" class="border-t pt-4" style="display: none;">
-              <h2 class="font-semibold text-lg mb-3">Display Metric</h2>
-              <select
-                id="selectedMetric"
-                onchange="updateChart()"
-                class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none"
-              >
-                <option value="temperature">Temperature</option>
-                <option value="precipitation">Precipitation</option>
-                <option value="windSpeed">Wind Speed</option>
-                <option value="humidity">Humidity</option>
-              </select>
-            </div>
           </div>
         </div>
 
-        <div class="flex-1 flex flex-col">
-          <div id="map" class="flex-1" style="min-height: 400px;"></div>
+        <div class="flex-1 flex flex-col overflow-hidden">
+          <div id="map" class="flex-1" style="min-height: 300px;"></div>
           
-          <div id="chartContainer" class="h-80 bg-white border-t p-4" style="display: none;">
-            <h2 class="font-semibold text-lg mb-2" id="chartTitle">Temperature (°C)</h2>
-            <div class="chart-container">
-              <canvas id="weatherChart"></canvas>
+          <div id="chartsContainer" class="flex-1 bg-white border-t overflow-y-auto" style="display: none;">
+            <div class="p-4 space-y-6">
+              <div>
+                <h2 class="font-semibold text-lg mb-2" id="avgChartTitle">Average Wind Speed at 10m (knots) by Day of Month</h2>
+                <div style="height: 300px;">
+                  <canvas id="avgChart"></canvas>
+                </div>
+              </div>
+              
+              <div class="border-t pt-4">
+                <h2 class="font-semibold text-lg mb-2">Wind Speed Distribution at 10m (knots)</h2>
+                <div style="height: 300px;">
+                  <canvas id="distChart"></canvas>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -147,7 +168,8 @@
     let points = [];
     let markers = [];
     let weatherData = [];
-    let chart = null;
+    let avgChart = null;
+    let distChart = null;
     const colors = ['#3b82f6', '#ef4444', '#10b981'];
 
     // Initialize map
@@ -210,10 +232,9 @@
         weatherData = weatherData.filter(d => d.pointId !== id);
         updatePointsList();
         if (weatherData.length > 0) {
-          updateChart();
+          updateCharts();
         } else {
-          document.getElementById('chartContainer').style.display = 'none';
-          document.getElementById('metricSelector').style.display = 'none';
+          document.getElementById('chartsContainer').style.display = 'none';
         }
       }
     }
@@ -223,6 +244,14 @@
       const startHour = parseInt(startTime.split(':')[0]);
       const endHour = parseInt(endTime.split(':')[0]);
       return hour >= startHour && hour <= endHour;
+    }
+
+    function getDaysInMonth(month) {
+      const days = {
+        '01': 31, '02': 29, '03': 31, '04': 30, '05': 31, '06': 30,
+        '07': 31, '08': 31, '09': 30, '10': 31, '11': 30, '12': 31
+      };
+      return days[month];
     }
 
     async function fetchWeatherData() {
@@ -235,8 +264,9 @@
       btn.disabled = true;
       btn.textContent = 'Loading...';
 
-      const startDate = document.getElementById('startDate').value;
-      const endDate = document.getElementById('endDate').value;
+      const startYear = parseInt(document.getElementById('startYear').value);
+      const endYear = parseInt(document.getElementById('endYear').value);
+      const selectedMonth = document.getElementById('selectedMonth').value;
       const startTime = document.getElementById('startTime').value;
       const endTime = document.getElementById('endTime').value;
 
@@ -247,57 +277,45 @@
 
       try {
         for (const point of points) {
-          const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${point.lat}&longitude=${point.lng}&start_date=${startDate}&end_date=${endDate}&hourly=temperature_2m,precipitation,windspeed_10m,relativehumidity_2m&timezone=auto`;
-          
-          const response = await fetch(url);
-          const data = await response.json();
+          for (let year = startYear; year <= endYear; year++) {
+            const daysInMonth = getDaysInMonth(selectedMonth);
+            const startDate = `${year}-${selectedMonth}-01`;
+            const endDate = `${year}-${selectedMonth}-${daysInMonth}`;
 
-          if (data.hourly) {
-            const filteredData = data.hourly.time
-              .map((time, idx) => ({
-                time,
-                temp: data.hourly.temperature_2m[idx],
-                precip: data.hourly.precipitation[idx],
-                wind: data.hourly.windspeed_10m[idx],
-                humidity: data.hourly.relativehumidity_2m[idx]
-              }))
-              .filter(item => isTimeInRange(item.time, startTime, endTime));
+            const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${point.lat}&longitude=${point.lng}&start_date=${startDate}&end_date=${endDate}&hourly=windspeed_10m&timezone=auto`;
+            
+            const response = await fetch(url);
+            const data = await response.json();
 
-            const dailyData = {};
-            filteredData.forEach(item => {
-              const date = item.time.split('T')[0];
-              if (!dailyData[date]) {
-                dailyData[date] = {
-                  temps: [],
-                  precips: [],
-                  winds: [],
-                  humidities: []
-                };
-              }
-              dailyData[date].temps.push(item.temp);
-              dailyData[date].precips.push(item.precip);
-              dailyData[date].winds.push(item.wind);
-              dailyData[date].humidities.push(item.humidity);
-            });
+            if (data.hourly) {
+              const filteredData = data.hourly.time
+                .map((time, idx) => ({
+                  time,
+                  wind: data.hourly.windspeed_10m[idx]
+                }))
+                .filter(item => isTimeInRange(item.time, startTime, endTime));
 
-            Object.keys(dailyData).forEach(date => {
-              const day = dailyData[date];
-              weatherData.push({
-                date,
-                pointId: point.id,
-                pointName: point.name,
-                tempMean: day.temps.reduce((a, b) => a + b, 0) / day.temps.length,
-                precipitation: day.precips.reduce((a, b) => a + b, 0),
-                windSpeed: day.winds.reduce((a, b) => a + b, 0) / day.winds.length,
-                humidity: day.humidities.reduce((a, b) => a + b, 0) / day.humidities.length
+              filteredData.forEach(item => {
+                const date = item.time.split('T')[0];
+                const dayOfMonth = parseInt(date.split('-')[2]);
+                
+                // Convert km/h to knots (1 km/h = 0.539957 knots)
+                const windSpeedKnots = item.wind * 0.539957;
+                
+                weatherData.push({
+                  pointId: point.id,
+                  pointName: point.name,
+                  year: year,
+                  dayOfMonth: dayOfMonth,
+                  windSpeed: windSpeedKnots
+                });
               });
-            });
+            }
           }
         }
 
-        document.getElementById('metricSelector').style.display = 'block';
-        document.getElementById('chartContainer').style.display = 'block';
-        updateChart();
+        document.getElementById('chartsContainer').style.display = 'block';
+        updateCharts();
       } catch (error) {
         alert('Error fetching weather data: ' + error.message);
       } finally {
@@ -306,63 +324,56 @@
       }
     }
 
-    function updateChart() {
-      const selectedMetric = document.getElementById('selectedMetric').value;
+    function updateCharts() {
       const startTime = document.getElementById('startTime').value;
       const endTime = document.getElementById('endTime').value;
+      const startYear = document.getElementById('startYear').value;
+      const endYear = document.getElementById('endYear').value;
+      const monthName = document.getElementById('selectedMonth').selectedOptions[0].text;
 
-      const groupedByDate = {};
-      weatherData.forEach(item => {
-        if (!groupedByDate[item.date]) {
-          groupedByDate[item.date] = { date: item.date };
+      // Calculate average wind speed by day of month for each point
+      const avgByDay = {};
+      
+      points.forEach(point => {
+        avgByDay[point.name] = {};
+        for (let day = 1; day <= 31; day++) {
+          const dayData = weatherData.filter(d => 
+            d.pointId === point.id && d.dayOfMonth === day
+          );
+          if (dayData.length > 0) {
+            const avg = dayData.reduce((sum, d) => sum + d.windSpeed, 0) / dayData.length;
+            avgByDay[point.name][day] = avg;
+          }
         }
-        
-        const value = selectedMetric === 'temperature' ? item.tempMean :
-                     selectedMetric === 'precipitation' ? item.precipitation :
-                     selectedMetric === 'humidity' ? item.humidity :
-                     item.windSpeed;
-        
-        groupedByDate[item.date][item.pointName] = value;
       });
 
-      const chartData = Object.values(groupedByDate);
-      const dates = chartData.map(d => d.date);
-
-      const datasets = points.map((point, idx) => ({
+      // Update average chart
+      const days = Array.from({length: 31}, (_, i) => i + 1);
+      const avgDatasets = points.map((point, idx) => ({
         label: point.name,
-        data: chartData.map(d => d[point.name]),
+        data: days.map(day => avgByDay[point.name][day] || null),
         borderColor: colors[idx],
         backgroundColor: colors[idx],
-        tension: 0.1
+        tension: 0.1,
+        spanGaps: true
       }));
 
-      const metricLabels = {
-        temperature: 'Temperature (°C)',
-        precipitation: 'Precipitation (mm)',
-        windSpeed: 'Wind Speed (km/h)',
-        humidity: 'Humidity (%)'
-      };
+      document.getElementById('avgChartTitle').textContent = 
+        `Average Wind Speed at 10m (knots) by Day of Month (${monthName} ${startYear}-${endYear}, ${startTime}-${endTime})`;
 
-      document.getElementById('chartTitle').textContent = `${metricLabels[selectedMetric]} (${startTime} - ${endTime})`;
-
-      if (chart) {
-        chart.destroy();
-      }
-
-      const ctx = document.getElementById('weatherChart').getContext('2d');
-      chart = new Chart(ctx, {
+      if (avgChart) avgChart.destroy();
+      const avgCtx = document.getElementById('avgChart').getContext('2d');
+      avgChart = new Chart(avgCtx, {
         type: 'line',
         data: {
-          labels: dates,
-          datasets: datasets
+          labels: days,
+          datasets: avgDatasets
         },
         options: {
           responsive: true,
           maintainAspectRatio: false,
           plugins: {
-            legend: {
-              position: 'top',
-            },
+            legend: { position: 'top' },
             tooltip: {
               mode: 'index',
               intersect: false,
@@ -370,18 +381,73 @@
           },
           scales: {
             x: {
-              display: true,
-              title: {
-                display: true,
-                text: 'Date'
-              }
+              title: { display: true, text: 'Day of Month' }
             },
             y: {
-              display: true,
-              title: {
-                display: true,
-                text: metricLabels[selectedMetric]
+              title: { display: true, text: 'Wind Speed (knots)' },
+              beginAtZero: true
+            }
+          }
+        }
+      });
+
+      // Calculate wind speed distribution (in knots)
+      const bins = [0, 3, 6, 9, 12, 15, 18, 21, 24, 100];
+      const binLabels = bins.slice(0, -1).map((b, i) => `${b}-${bins[i+1]} kts`);
+      
+      const distDatasets = points.map((point, idx) => {
+        const pointData = weatherData.filter(d => d.pointId === point.id);
+        const total = pointData.length;
+        const counts = new Array(bins.length - 1).fill(0);
+        
+        pointData.forEach(d => {
+          for (let i = 0; i < bins.length - 1; i++) {
+            if (d.windSpeed >= bins[i] && d.windSpeed < bins[i + 1]) {
+              counts[i]++;
+              break;
+            }
+          }
+        });
+        
+        const percentages = counts.map(c => (c / total * 100).toFixed(1));
+        
+        return {
+          label: point.name,
+          data: percentages,
+          backgroundColor: colors[idx],
+          borderColor: colors[idx],
+          borderWidth: 1
+        };
+      });
+
+      if (distChart) distChart.destroy();
+      const distCtx = document.getElementById('distChart').getContext('2d');
+      distChart = new Chart(distCtx, {
+        type: 'bar',
+        data: {
+          labels: binLabels,
+          datasets: distDatasets
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'top' },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  return context.dataset.label + ': ' + context.parsed.y + '%';
+                }
               }
+            }
+          },
+          scales: {
+            x: {
+              title: { display: true, text: 'Wind Speed Range' }
+            },
+            y: {
+              title: { display: true, text: 'Percentage (%)' },
+              beginAtZero: true
             }
           }
         }
