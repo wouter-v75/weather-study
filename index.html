@@ -410,7 +410,7 @@
           label: `${point.name} error range`,
           data: errorMax,
           borderColor: 'transparent',
-          backgroundColor: colors[idx] + '20', // 20 = ~12% opacity in hex
+          backgroundColor: colors[idx] + '50', // 50 = ~31% opacity in hex
           tension: 0.1,
           spanGaps: true,
           fill: '+1', // Fill to next dataset (which will be errorMin)
@@ -423,7 +423,7 @@
           label: `${point.name} error lower`,
           data: errorMin,
           borderColor: 'transparent',
-          backgroundColor: colors[idx] + '20',
+          backgroundColor: colors[idx] + '50',
           tension: 0.1,
           spanGaps: true,
           pointRadius: 0,
@@ -473,7 +473,7 @@
       });
 
       document.getElementById('avgChartTitle').textContent = 
-        `Average Wind Speed at 10m (knots) by Day of Month (${monthName} ${startYear}-${endYear}, ${startTime}-${endTime})\nShaded areas show yearly average range`;
+        `Average Wind Speed at 10m (knots) by Day of Month (${monthName} ${startYear}-${endYear}, ${startTime}-${endTime})`;
 
       if (avgChart) avgChart.destroy();
       const avgCtx = document.getElementById('avgChart').getContext('2d');
