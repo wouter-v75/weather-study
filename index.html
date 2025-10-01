@@ -674,7 +674,7 @@
         chartDiv.className = 'bg-white p-4 rounded border';
         chartDiv.innerHTML = `
           <h3 class="font-semibold mb-2" style="color: ${colors[idx]}">${point.name}</h3>
-          <div style="height: 350px;">
+          <div style="height: 500px;">
             <canvas id="windRose${point.id}"></canvas>
           </div>
         `;
@@ -693,7 +693,7 @@
             maintainAspectRatio: false,
             plugins: {
               legend: {
-                position: 'right'
+                display: false
               },
               tooltip: {
                 callbacks: {
